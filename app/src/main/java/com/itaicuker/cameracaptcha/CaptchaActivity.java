@@ -4,6 +4,7 @@ package com.itaicuker.cameracaptcha;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
+import android.Manifest;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -71,6 +72,32 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
 
     }
 
+    /**
+     * deleting cache data on destroy
+     */
+    //region onDestroy
+
+    @Override
+    protected void onDestroy()
+    {
+        deleteCacheData();
+        super.onDestroy();
+    }
+
+    public void deleteCacheData()
+    {
+        File cacheDir = this.getCacheDir();
+        File[] files = cacheDir.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                file.delete();
+            }
+        }
+    }
+
+    //endregion onDestroy
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data)
     {
@@ -99,7 +126,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
             }
             else if (id == btnDelete.getId())
             {
-                Call<ResponseBody> call = imgurAPI.deleteImage(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), deleteHash));
+                Call<ResponseBody> call = imgurAPI.deleteImage(RequestBody.create(MediaType.parse("text/plain"), deleteHash));
                 call.enqueue(new Callback<ResponseBody>()
                 {
                     @Override
@@ -108,7 +135,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
                         if (response.isSuccessful())
                             Log.d("Imgur API", "delete success! =" + response.code());
                         else
-                            Log.d("Imgur API", "delete no success! =" + response.code());
+                            Log.d("Imgur API", "delete no success! =" + response.code() + "\t" + response.errorBody());
                     }
 
                     @Override
@@ -130,7 +157,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
                         MultipartBody.Part.createFormData(
                                 "image",
                                 photoFile.getName(),
-                                RequestBody.create(MediaType.parse("image/*"), photoFile)));
+                                RequestBody.create(photoFile, MediaType.parse("image/*"))));
         call.enqueue(new Callback<ImageResponse>() {
             @Override
             public void onResponse(Call<ImageResponse> call, Response<ImageResponse> response) {
@@ -151,7 +178,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
             @Override
             public void onFailure(Call<ImageResponse> call, Throwable t)
             {
-                Log.d("Imgur API", "failed! =\n" + t.getMessage());
+                Log.d("Imgur API", "failed! =\n" + t.toString());
             }
         });
     }
@@ -161,7 +188,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
     private void dispatchTakePictureIntent()
     {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-
+        Log.d("monkey", "in dispatch");
         // Ensure that there's a camera activity to handle the intent
         if (takePictureIntent.resolveActivity(getPackageManager()) != null)
         {
