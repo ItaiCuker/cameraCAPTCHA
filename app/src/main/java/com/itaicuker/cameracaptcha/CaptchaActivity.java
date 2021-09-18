@@ -1,20 +1,18 @@
 package com.itaicuker.cameracaptcha;
 
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
-
-import android.Manifest;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
-
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,10 +22,8 @@ import java.util.Date;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
-import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
-import retrofit2.Response;
 
 public class CaptchaActivity extends AppCompatActivity implements View.OnClickListener
 {
@@ -35,13 +31,10 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
 
     private static final int REQUEST_IMAGE_CAPTURE = 1;
     private static final ImgurAPI imgurAPI = ImgurAPI.retrofit.create(ImgurAPI.class);
-    private String deleteHash;
     private File photoFile;
 
     //view objects
     Button btnGetImage;
-    Button btnURL;
-    Button btnDelete;
     ImageButton btn1;
     ImageButton btn2;
     ImageButton btn3;
@@ -57,8 +50,6 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
 
         //binding view objects
         btnGetImage = findViewById(R.id.btnGetImage);
-        btnURL = findViewById(R.id.btnURL);
-        btnDelete =  findViewById(R.id.btnDelete);
         btn1 =  findViewById(R.id.btn1);
         btn2 =  findViewById(R.id.btn2);
         btn3 =  findViewById(R.id.btn3);
@@ -66,10 +57,6 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
 
         //setting on click
         btnGetImage.setOnClickListener(this);
-        btnURL.setOnClickListener(this);
-        btnDelete.setOnClickListener(this);
-
-
     }
 
     /**
@@ -117,35 +104,6 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
         {
             dispatchTakePictureIntent();
         }
-        else if (!btnURL.getTag().toString().equals("1"))
-        {
-            if (id == btnURL.getId())
-            {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(btnURL.getTag().toString()));
-                startActivity(intent);
-            }
-            else if (id == btnDelete.getId())
-            {
-                Call<ResponseBody> call = imgurAPI.deleteImage(RequestBody.create(MediaType.parse("text/plain"), deleteHash));
-                call.enqueue(new Callback<ResponseBody>()
-                {
-                    @Override
-                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response)
-                    {
-                        if (response.isSuccessful())
-                            Log.d("Imgur API", "delete success! =" + response.code());
-                        else
-                            Log.d("Imgur API", "delete no success! =" + response.code() + "\t" + response.errorBody());
-                    }
-
-                    @Override
-                    public void onFailure(Call<ResponseBody> call, Throwable t)
-                    {
-                        Log.d("Imgur API", "delete failed");
-                    }
-                });
-            }
-        }
     }
 
 
@@ -160,25 +118,19 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
                                 RequestBody.create(photoFile, MediaType.parse("image/*"))));
         call.enqueue(new Callback<ImageResponse>() {
             @Override
-            public void onResponse(Call<ImageResponse> call, Response<ImageResponse> response) {
+            public void onResponse(Call<ImageResponse> call, retrofit2.Response<ImageResponse> response)
+            {
                 ImageResponse tmp = response.body();
                 if (response.isSuccessful())
-                {
-
                     Log.d("Imgur API", "upload success! =" + tmp.getStatus());
-                    btnURL.setTag(tmp.getData().getLink());
-                    deleteHash = tmp.getData().getDeleteHash();
-                }
                 else
-                {
                     Log.d("Imgur API", "upload no success! =" + tmp.getStatus());
-                }
             }
 
             @Override
             public void onFailure(Call<ImageResponse> call, Throwable t)
             {
-                Log.d("Imgur API", "failed! =\n" + t.toString());
+                Log.d("Imgur API", "upload fail! =" + t.toString());
             }
         });
     }

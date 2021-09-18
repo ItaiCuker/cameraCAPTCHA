@@ -2,11 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.itaicuker.cameracaptcha">
 
+
     <!-- permissions, features -->
-    <uses-feature android:name="android.hardware.camera"
+    <uses-permission android:name="android.hardware.camera"
         android:required="true" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
