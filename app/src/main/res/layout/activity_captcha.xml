@@ -84,4 +84,13 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.631" />
 
+    <Button
+        android:id="@+id/btnGoToSimilar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="go to similar"
+        app:layout_constraintStart_toStartOf="@+id/btnGetImage"
+        app:layout_constraintTop_toBottomOf="@+id/btnGetImage" />
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>
