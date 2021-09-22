@@ -1,25 +1,20 @@
 package com.itaicuker.cameracaptcha;
 
 
-import com.google.gson.annotations.Expose;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class BingRequest
-{
-    @SerializedName("imageInfo")
-    @Expose
-    private ImageInfo imageInfo;
+public class BingRequest {
+    @JsonProperty("imageInfo")
+    private final ImageInfo imageInfo;
 
     public BingRequest(String url) {
         this.imageInfo = new ImageInfo(url);
     }
 
-    private class ImageInfo
-    {
+    private class ImageInfo {
 
-        @SerializedName("url")
-        @Expose
-        private String url;
+        @JsonProperty("url")
+        private final String url;
 
         public ImageInfo(String url) {
             this.url = url;

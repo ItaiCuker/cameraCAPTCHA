@@ -1,29 +1,20 @@
 
 package com.itaicuker.cameracaptcha;
 
-import com.google.gson.annotations.Expose;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.List;
-
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ImgurResponse {
-
-    @SerializedName("data")
-    @Expose
+    @JsonProperty("data")
     private Data data;
-    @SerializedName("success")
-    @Expose
+    @JsonProperty("success")
     private boolean success;
-    @SerializedName("status")
-    @Expose
+    @JsonProperty("status")
     private int status;
 
     public Data getData() {
         return data;
-    }
-
-    public void setData(Data data) {
-        this.data = data;
     }
 
     public boolean isSuccess() {
@@ -44,12 +35,9 @@ public class ImgurResponse {
 
     public class Data {
 
-
-        @SerializedName("deletehash")
-        @Expose
+        @JsonProperty("deletehash")
         private String deleteHash;
-        @SerializedName("link")
-        @Expose
+        @JsonProperty("link")
         private String link;
 
         public String getDeleteHash() {
@@ -63,11 +51,6 @@ public class ImgurResponse {
         public String getLink() {
             return link;
         }
-
-        public void setLink(String link) {
-            this.link = link;
-        }
-
     }
 
 }
