@@ -38,9 +38,15 @@ interface ClientAPI
     /**
      * API GET request to get results from bing reverse image
      *
-     * @param url
+     * @param request the request object
      * @return JSON with bing results
      */
+    @Multipart
+    @Headers({"Ocp-Apim-Subscription-Key: " + BING_KEY})
+    @POST(BING_BASE_URL + "v7.0/images/visualsearch")
+    Call<ImageKnowledge> getReverseImageSearch(
+            @Part("knowledgeRequest") RequestBody request);
+
     String BING_BASE_URL = "https://api.bing.microsoft.com/";
     String BING_KEY = "20a82b96626c4871b8857a92c11f8efa";
     ObjectMapper mapper = new ObjectMapper()
@@ -56,10 +62,4 @@ interface ClientAPI
             .addConverterFactory(JacksonConverterFactory.create(mapper))
             .client(httpClient.build())
             .build();
-
-    @Multipart
-    @Headers({"Ocp-Apim-Subscription-Key: " + BING_KEY})
-    @POST(BING_BASE_URL + "v7.0/images/visualsearch")
-    Call<ImageKnowledge> getReverseImageSearch(
-            @Part("knowledgeRequest") RequestBody request);
 }

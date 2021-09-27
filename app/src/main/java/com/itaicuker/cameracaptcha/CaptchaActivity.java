@@ -11,10 +11,19 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ProgressBar;
+import android.widget.TableLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageAction;
+import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageKnowledge;
+import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageModuleAction;
+import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageObject;
+import com.squareup.picasso.Picasso;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -22,17 +31,32 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class CaptchaActivity extends AppCompatActivity implements View.OnClickListener {
     //region declarations
 
+    private static final ClientAPI CLIENT_API = ClientAPI.retrofit.create(ClientAPI.class);
     private static final int REQUEST_IMAGE_CAPTURE = 1;
     private File photoFile;
 
+    ArrayList<ImageObject> imageObjects;
+    ArrayList<String> fourItems;
     ImageButton[] btns;
+    String url;
 
     //view objects
+    TableLayout tableLayout;
+    ProgressBar spinner;
     Button btnGetImage;
     Button btnGoToSimilar;
     ImageButton btn1;
@@ -43,12 +67,14 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
     //endregion declarations
 
     @Override
-    protected void onCreate(Bundle savedInstanceState)
-    {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_captcha);
 
         //binding view objects
+
+        tableLayout = findViewById(R.id.tableLayout);
+        spinner = findViewById(R.id.progressBar);
         btnGetImage = findViewById(R.id.btnGetImage);
         btnGoToSimilar = findViewById(R.id.btnGoToSimilar);
         btn1 = findViewById(R.id.btn1);
@@ -98,6 +124,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
         {
             Bitmap bitmap = BitmapFactory.decodeFile(photoFile.getAbsolutePath());
             bitmap = resize(bitmap, 4000, 4000);
+
             try {
                 photoFile.delete();
                 OutputStream os = new BufferedOutputStream(new FileOutputStream(photoFile));
@@ -108,31 +135,112 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            CaptchaClient.uploadImage(photoFile);
+
+
+            spinner.setVisibility(View.VISIBLE);
+            uploadImage(photoFile);
         }
     }
 
     @Override
-    public void onClick(View v)
-    {
+    public void onClick(View v) {
         int id = v.getId();
 
-        if (id == btnGetImage.getId())
-        {
+        if (id == btnGetImage.getId()) {
             dispatchTakePictureIntent();
         }
 
     }
 
+    public void init(List<ImageObject> lst) {
+        imageObjects = (ArrayList<ImageObject>) lst;
+        spinner.setVisibility(View.GONE);
+
+        if (imageObjects.size() > 3) {
+            fourItems = new ArrayList<>();
+            fourItems.add(url);
+            for (int i = 0; i < 3; i++) {
+                fourItems.add(imageObjects.get(i).contentUrl());
+            }
+            Log.d("cuker", fourItems.toString());
+            tableLayout.setVisibility(View.VISIBLE);
+            for (int i = 1; i < 4; i++) {
+                Picasso.get()
+                        .load(fourItems.get(i))
+                        //.resize(btns[0].getLayoutParams().width, btns[0].getLayoutParams().height)
+                        .into(btns[i]);
+
+            }
+        }
+    }
+
+    public void uploadImage(File photoFile) {
+        Log.d("monkey", "in testExecute");
+        Call<ImgurResponse> call =
+                CLIENT_API.postImage(
+                        MultipartBody.Part.createFormData(
+                                "image",
+                                photoFile.getName(),
+                                RequestBody.create(photoFile, MediaType.parse("image/*"))));
+        call.enqueue(new Callback<ImgurResponse>() {
+            @Override
+            public void onResponse(Call<ImgurResponse> call, retrofit2.Response<ImgurResponse> response) {
+                ImgurResponse tmp = response.body();
+                if (response.isSuccessful()) {
+                    Log.d("Imgur API", "upload success! =" + tmp.getStatus());
+                    url = tmp.getData().getLink();
+                    reverseImageSearch(url);
+                } else
+                    Log.d("Imgur API", "upload no success! =" + tmp.getStatus());
+            }
+
+            @Override
+            public void onFailure(Call<ImgurResponse> call, Throwable t) {
+                Log.d("Imgur API", "upload fail! =" + t.toString());
+            }
+        });
+    }
+
+    public void reverseImageSearch(String link) {
+        Call<ImageKnowledge> call =
+                null;
+        try {
+            call = CLIENT_API.getReverseImageSearch(
+                    RequestBody.create(
+                            ClientAPI.mapper.writeValueAsString(new BingRequest(link)),
+                            MediaType.parse("application/json")));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        call.enqueue(new Callback<ImageKnowledge>() {
+            @Override
+            public void onResponse(Call<ImageKnowledge> call, Response<ImageKnowledge> response) {
+                if (response.isSuccessful()) {
+                    List<ImageObject> lst = null;
+                    for (ImageAction tmp : response.body().tags().get(0).actions()) {
+                        if (tmp.actionType().equals("VisualSearch")) {
+                            lst = ((ImageModuleAction) tmp).data().value();
+                            break;
+                        }
+                    }
+                    init(lst);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ImageKnowledge> call, Throwable t) {
+
+            }
+        });
+    }
+
     //region image procs
 
-    private void dispatchTakePictureIntent()
-    {
+    private void dispatchTakePictureIntent() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         Log.d("monkey", "in dispatch");
         // Ensure that there's a camera activity to handle the intent
-        if (takePictureIntent.resolveActivity(getPackageManager()) != null)
-        {
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
             // Create the File where the photo should go
             photoFile = null;
             try {
