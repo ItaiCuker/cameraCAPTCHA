@@ -1,6 +1,6 @@
 package com.itaicuker.cameracaptcha;
 
-
+import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -11,10 +11,11 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.TableLayout;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
@@ -25,6 +26,8 @@ import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageMod
 import com.microsoft.azure.cognitiveservices.search.visualsearch.models.ImageObject;
 import com.squareup.picasso.Picasso;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,6 +35,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -45,20 +49,22 @@ import retrofit2.Response;
 public class CaptchaActivity extends AppCompatActivity implements View.OnClickListener {
     //region declarations
 
-    private static final ClientAPI CLIENT_API = ClientAPI.retrofit.create(ClientAPI.class);
-    private static final int REQUEST_IMAGE_CAPTURE = 1;
-    private File photoFile;
+    final ClientAPI CLIENT_API = ClientAPI.retrofit.create(ClientAPI.class);    //my retrofit client object
+    final int REQUEST_IMAGE_CAPTURE = 1;    //request code for result
+    Picasso picasso;    //Async image loader lib object
+    File photoFile; //saved image file
 
-    ArrayList<ImageObject> imageObjects;
-    ArrayList<String> fourItems;
+    //game vars
+    String url; //the saved imgur url of client photo
+    int count;  //number of (5 attempts and you get kicked from CAPTCHA)
+
+    ArrayList<String> fourItems, urlPool;
     ImageButton[] btns;
-    String url;
 
     //view objects
-    TableLayout tableLayout;
+    LinearLayout linearLayout;
     ProgressBar spinner;
-    Button btnGetImage;
-    Button btnGoToSimilar;
+    Button btnTakeImage;
     ImageButton btn1;
     ImageButton btn2;
     ImageButton btn3;
@@ -71,39 +77,41 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_captcha);
 
-        //binding view objects
-
-        tableLayout = findViewById(R.id.tableLayout);
+        picasso = new Picasso.Builder(this).build();    //init picasso obj
+        //binding view objects:
+        linearLayout = findViewById(R.id.linearLayout);
         spinner = findViewById(R.id.progressBar);
-        btnGetImage = findViewById(R.id.btnGetImage);
-        btnGoToSimilar = findViewById(R.id.btnGoToSimilar);
+        btnTakeImage = findViewById(R.id.btnTakeImage);
         btn1 = findViewById(R.id.btn1);
         btn2 = findViewById(R.id.btn2);
         btn3 = findViewById(R.id.btn3);
         btn4 = findViewById(R.id.btn4);
 
-        //binding buttons to array of buttons.
-        btns = new ImageButton[]{btn1, btn2, btn3, btn4};
+        btns = new ImageButton[]{btn1, btn2, btn3, btn4};   //binding buttons to array of buttons.
 
         //setting on click
-        btnGetImage.setOnClickListener(this);
-        btnGoToSimilar.setOnClickListener(this);
+        for (int i = 0; i < 4; i++) {
+            btns[i].setOnClickListener(this);
+        }
+        btnTakeImage.setOnClickListener(this);
+
+        linearLayout.setVisibility(View.GONE);   //hiding ImageButtons (at start)
     }
 
     /**
      * deleting cache data on destroy
      */
     //region onDestroy
-
     @Override
-    protected void onDestroy()
-    {
+    protected void onDestroy() {
         deleteCacheData();
         super.onDestroy();
     }
 
-    public void deleteCacheData()
-    {
+    /**
+     * function to delete all files from getCacheDir()
+     */
+    public void deleteCacheData() {
         File cacheDir = this.getCacheDir();
         File[] files = cacheDir.listFiles();
 
@@ -114,21 +122,32 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
         }
     }
 
+    /**
+     * function that sends boolean result back to MainActivity
+     *
+     * @param flag the boolean result
+     */
+    public void sendResult(boolean flag) {
+        Intent resultIntent = new Intent();
+        resultIntent.putExtra("flag", flag);
+        setResult(Activity.RESULT_OK, resultIntent);
+        finish();
+    }
+
     //endregion onDestroy
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data)
-    {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK)
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK)    //if camera result is good
         {
-            Bitmap bitmap = BitmapFactory.decodeFile(photoFile.getAbsolutePath());
-            bitmap = resize(bitmap, 4000, 4000);
+            Bitmap bitmap = BitmapFactory.decodeFile(photoFile.getAbsolutePath());  //getting the bitmap of picture
+            bitmap = resize(bitmap, 4000, 4000);  //resizing bitmap to less than max size that Bing API can use
 
             try {
-                photoFile.delete();
+                photoFile.delete(); //deleting file
                 OutputStream os = new BufferedOutputStream(new FileOutputStream(photoFile));
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, os);    //compressing bitmap to save it back to file.
                 os.flush();
                 os.close();
                 bitmap.recycle();
@@ -136,9 +155,8 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
                 e.printStackTrace();
             }
 
-
-            spinner.setVisibility(View.VISIBLE);
-            uploadImage(photoFile);
+            spinner.setVisibility(View.VISIBLE);    //showing loading spinner on UI
+            uploadImage(photoFile); //starting upload function
         }
     }
 
@@ -146,99 +164,178 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
     public void onClick(View v) {
         int id = v.getId();
 
-        if (id == btnGetImage.getId()) {
+        if (id == btnTakeImage.getId()) {    //button to take picture
+            linearLayout.setVisibility(View.GONE);
             dispatchTakePictureIntent();
         }
-
-    }
-
-    public void init(List<ImageObject> lst) {
-        imageObjects = (ArrayList<ImageObject>) lst;
-        spinner.setVisibility(View.GONE);
-
-        if (imageObjects.size() > 3) {
-            fourItems = new ArrayList<>();
-            fourItems.add(url);
-            for (int i = 0; i < 3; i++) {
-                fourItems.add(imageObjects.get(i).contentUrl());
-            }
-            Log.d("cuker", fourItems.toString());
-            tableLayout.setVisibility(View.VISIBLE);
-            for (int i = 1; i < 4; i++) {
-                Picasso.get()
-                        .load(fourItems.get(i))
-                        //.resize(btns[0].getLayoutParams().width, btns[0].getLayoutParams().height)
-                        .into(btns[i]);
-
-            }
+        //image buttons
+        else if (v.getTag().toString().equals(url))  //if client correct
+            sendResult(true);
+        else {  //incorrect
+            count++;
+            if (count == 5) //if client failed too many times
+                sendResult(false);
+            next();
         }
     }
 
+    /**
+     * initializing CAPTCHA game. calling first round afterwards if no fail
+     *
+     * @param lst list of Bing result.
+     */
+    public void init(ArrayList<ImageObject> lst) {
+        count = 0;  //resetting count
+
+        urlPool = new ArrayList<>();
+        if (lst.size() > 3) {   //if sufficient results
+            for (int i = 0; i < lst.size(); i++)
+                urlPool.add(lst.get(i).contentUrl());
+            next();
+        } else {   //if Bing API doesn't have enough pictures.
+            new AlertDialog.Builder(this)
+                    .setMessage("Image does not have sufficient amount of similar results, try to take another.")
+                    .setTitle("Maybe try another picture :/")
+                    .setPositiveButton("TAKE PICTURE", (dialog, which) -> dispatchTakePictureIntent());
+        }
+    }
+
+    /**
+     * function to re shuffle image buttons.
+     * loads pictures from web using Picasso library
+     */
+    public void next() {
+        //shuffles and add items:
+
+        Collections.shuffle(urlPool);
+
+        fourItems = new ArrayList<>();
+        fourItems.add(url);
+        for (int i = 0; i < 3; i++)
+            fourItems.add(urlPool.get(i));
+        Collections.shuffle(fourItems);
+        Log.d("cuker", fourItems.toString());
+
+        //showing loading spinner and hiding ImageButtons
+        spinner.setVisibility(View.VISIBLE);
+        linearLayout.setVisibility(View.GONE);
+
+
+        //loading images to ImageButton views
+        for (int i = 0; i < 4; i++) {
+            int finalI = i; //to use I inside inner class
+            picasso.load(fourItems.get(i))
+                    .into(btns[i], new com.squareup.picasso.Callback() {
+                        @Override
+                        public void onSuccess() {
+                            if (finalI == 3)    ////Waiting for last image to show imageButtons
+                            {
+                                //hiding spinner and showing ImageButtons
+                                spinner.setVisibility(View.GONE);
+                                linearLayout.setVisibility(View.VISIBLE);
+                            }
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            Log.e("Picasso", e.toString());
+                        }
+                    });
+            btns[i].setTag(fourItems.get(i));   //changing tag so I can find clients image.
+        }
+    }
+
+    //region API calls
+
+    /**
+     * API function to upload image to imgur API anonymously.
+     *
+     * @param photoFile the File object of image
+     */
     public void uploadImage(File photoFile) {
-        Log.d("monkey", "in testExecute");
-        Call<ImgurResponse> call =
+
+        Call<ImgurResponse> call =  //Call object
                 CLIENT_API.postImage(
                         MultipartBody.Part.createFormData(
                                 "image",
                                 photoFile.getName(),
                                 RequestBody.create(photoFile, MediaType.parse("image/*"))));
+
+        /* ↑ initializing the HTTP request using requirements of API ↑ */
+        /* ↓ enqueuing the request Asynchronously and creating callback for it↓ */
+
         call.enqueue(new Callback<ImgurResponse>() {
             @Override
-            public void onResponse(Call<ImgurResponse> call, retrofit2.Response<ImgurResponse> response) {
+            public void onResponse(Call<ImgurResponse> call, @NotNull retrofit2.Response<ImgurResponse> response) {
                 ImgurResponse tmp = response.body();
-                if (response.isSuccessful()) {
-                    Log.d("Imgur API", "upload success! =" + tmp.getStatus());
-                    url = tmp.getData().getLink();
-                    reverseImageSearch(url);
-                } else
-                    Log.d("Imgur API", "upload no success! =" + tmp.getStatus());
+                if (response.isSuccessful()) {  //if http returns success status
+                    assert tmp != null;
+                    url = tmp.getData().getLink();  //getting string url
+                    reverseImageSearch(url);    //calling bing API function
+                }
             }
 
             @Override
-            public void onFailure(Call<ImgurResponse> call, Throwable t) {
+            public void onFailure(@NotNull Call<ImgurResponse> call, @NotNull Throwable t) {
                 Log.d("Imgur API", "upload fail! =" + t.toString());
             }
         });
     }
 
+    /**
+     * API function to  to get bing API visual search results for.
+     * getting result from callback via java objects
+     *
+     * @param link url of image
+     */
     public void reverseImageSearch(String link) {
-        Call<ImageKnowledge> call =
-                null;
+        Call<ImageKnowledge> call = null;
         try {
             call = CLIENT_API.getReverseImageSearch(
                     RequestBody.create(
-                            ClientAPI.mapper.writeValueAsString(new BingRequest(link)),
+                            ClientAPI.mapper.writeValueAsString(new BingRequest(link)), //creating object to parse to JSON string
                             MediaType.parse("application/json")));
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
+
+        //same as before, function is 2 parts.
+
+        assert call != null;
         call.enqueue(new Callback<ImageKnowledge>() {
             @Override
-            public void onResponse(Call<ImageKnowledge> call, Response<ImageKnowledge> response) {
-                if (response.isSuccessful()) {
-                    List<ImageObject> lst = null;
-                    for (ImageAction tmp : response.body().tags().get(0).actions()) {
+            public void onResponse(@NotNull Call<ImageKnowledge> call, @NotNull Response<ImageKnowledge> response) {
+                if (response.isSuccessful()) {  //if http returns success status
+                    List<ImageObject> lst = null;   //creating list
+                    assert response.body() != null;
+                    for (ImageAction tmp : response.body().tags().get(0).actions()) {   //iterating JSON object to get required data.
                         if (tmp.actionType().equals("VisualSearch")) {
                             lst = ((ImageModuleAction) tmp).data().value();
                             break;
                         }
                     }
-                    init(lst);
+                    init((ArrayList<ImageObject>) lst); //starting CAPTCHA
                 }
             }
 
             @Override
-            public void onFailure(Call<ImageKnowledge> call, Throwable t) {
+            public void onFailure(@NotNull Call<ImageKnowledge> call, @NotNull Throwable t) {
 
             }
         });
     }
 
-    //region image procs
+    //endregion API calls
 
+    //region image functions
+
+    /**
+     * calling intent to take picture from phones camera and saving it in cache directory of app
+     */
     private void dispatchTakePictureIntent() {
-        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        Log.d("monkey", "in dispatch");
+        linearLayout.setVisibility(View.GONE);   //hiding ImageButtons.
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE); //creating the intent with wanted action
+
         // Ensure that there's a camera activity to handle the intent
         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
             // Create the File where the photo should go
@@ -250,8 +347,7 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
                 Toast.makeText(this, "Err: camera unavailable!", Toast.LENGTH_SHORT);
             }
             // Continue only if the File was successfully created
-            if (photoFile != null)
-            {
+            if (photoFile != null) {
                 Uri photoURI = FileProvider.getUriForFile(this,
                         "com.itaicuker.cameracaptcha.fileprovider",
                         photoFile);
@@ -261,46 +357,49 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
         }
     }
 
-    private File createImageFile() throws IOException
-    {
+    /**
+     * @return empty File object to save image on it.
+     * @throws IOException because using storage
+     */
+    private File createImageFile() throws IOException {
         // Create an image file name
         String imageFileName = "JPEG_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + "_";
         File storageDir = getCacheDir();
-        File image = File.createTempFile(
-                imageFileName,  /* prefix */
-                ".jpg",         /* suffix */
-                storageDir      /* directory */
+        return File.createTempFile(
+                imageFileName,    /* prefix */
+                ".jpg",     /* suffix */
+                storageDir        /* directory */
         );
-        return image;
     }
 
     /**
      * resize image to max values
-     * @param image
-     * @param maxWidth
-     * @param maxHeight
-     * @return resized bitmap
+     *
+     * @param image     the bitmap to resize
+     * @param maxWidth  max width in pixels
+     * @param maxHeight max height in pixels
+     * @return Bitmap object of resized bitmap
      */
-    private static Bitmap resize(Bitmap image, int maxWidth, int maxHeight)
-    {
-        if (maxHeight > 0 && maxWidth > 0) {
-            int width = image.getWidth();
-            int height = image.getHeight();
-            float ratioBitmap = (float) width / (float) height;
-            float ratioMax = (float) maxWidth / (float) maxHeight;
+    private static Bitmap resize(Bitmap image, int maxWidth, int maxHeight) {
+        //image dimensions
+        int width = image.getWidth();
+        int height = image.getHeight();
 
-            int finalWidth = maxWidth;
-            int finalHeight = maxHeight;
-            if (ratioMax > ratioBitmap) {
-                finalWidth = (int) ((float)maxHeight * ratioBitmap);
-            } else {
-                finalHeight = (int) ((float)maxWidth / ratioBitmap);
-            }
-            image = Bitmap.createScaledBitmap(image, finalWidth, finalHeight, true);
-            return image;
+        //calculating ratios
+        float ratioBitmap = (float) width / (float) height;
+        float ratioMax = (float) maxWidth / (float) maxHeight;
+
+        int finalWidth = maxWidth;
+        int finalHeight = maxHeight;
+
+        //checking which dimension to change to reach dimension goal
+        if (ratioMax > ratioBitmap) {
+            finalWidth = (int) ((float) maxHeight * ratioBitmap);
         } else {
-            return image;
+            finalHeight = (int) ((float) maxWidth / ratioBitmap);
         }
+        image = Bitmap.createScaledBitmap(image, finalWidth, finalHeight, true);    //scaling image
+        return image;
     }
-    //endregion image procs
+    //endregion image functions
 }

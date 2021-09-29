@@ -1,13 +1,13 @@
 package com.itaicuker.cameracaptcha;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener
 {
@@ -17,7 +17,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btnCaptcha;
     TextView tvCaptcha;
 
-    boolean flag;
+    boolean flag;   //captcha result
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -45,11 +45,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //getting CAPTCHA results from Activity:
             flag = data.getExtras().getBoolean("flag");
             //setting Text:
-            String text = flag ? "true" : "false";
+            String text = flag ? "You are not a bot!!!" : "You are a bot :(";
             tvCaptcha.setText(text);
         }
         else if (resultCode == RESULT_CANCELED)
-            Toast.makeText(this, "FAIL: try again", Toast.LENGTH_LONG);
+            Toast.makeText(this, "FAIL: try again", Toast.LENGTH_LONG)
+                    .show();
     }
 
     @Override

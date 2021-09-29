@@ -22,6 +22,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CameraCAPTCHA"
         android:configChanges="orientation"
+        android:usesCleartextTraffic="true"
         android:screenOrientation="portrait">
 
         <provider
@@ -33,7 +34,8 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <activity android:name=".CaptchaActivity"></activity>
+
+        <activity android:name=".CaptchaActivity" />
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

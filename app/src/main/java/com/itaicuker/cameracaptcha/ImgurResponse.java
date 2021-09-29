@@ -4,6 +4,10 @@ package com.itaicuker.cameracaptcha;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+
+/**
+ * this class emulates a JSON object
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ImgurResponse {
     @JsonProperty("data")
@@ -33,7 +37,7 @@ public class ImgurResponse {
         this.status = status;
     }
 
-    public class Data {
+    public static class Data {
 
         @JsonProperty("deletehash")
         private String deleteHash;

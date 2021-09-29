@@ -23,8 +23,8 @@ interface ClientAPI
 {
     /**
      * API POST request to upload file to imgur.
-     * @param file
-     * @return imageResponse object with imgur url of photo.
+     *
+     * @return imgurResponse object with imgur url of photo.
      */
     String IMGUR_BASE_URL = "https://api.imgur.com/3/";
     String IMGUR_KEY = "51de28e6e78f328";
@@ -37,9 +37,7 @@ interface ClientAPI
 
     /**
      * API GET request to get results from bing reverse image
-     *
-     * @param request the request object
-     * @return JSON with bing results
+     * @return ImageKnowledge object with bing results (ImageKnowledge is from the Azure SDK I used)
      */
     @Multipart
     @Headers({"Ocp-Apim-Subscription-Key: " + BING_KEY})
@@ -49,17 +47,17 @@ interface ClientAPI
 
     String BING_BASE_URL = "https://api.bing.microsoft.com/";
     String BING_KEY = "20a82b96626c4871b8857a92c11f8efa";
-    ObjectMapper mapper = new ObjectMapper()
+    ObjectMapper mapper = new ObjectMapper()    //init jackson object parser.
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    OkHttpClient.Builder httpClient = new OkHttpClient.Builder()
+    OkHttpClient.Builder httpClient = new OkHttpClient.Builder()    //init okHttp client, so it won't timeout connection
             .connectTimeout(5, TimeUnit.MINUTES)
             .writeTimeout(5, TimeUnit.MINUTES)
             .readTimeout(5, TimeUnit.MINUTES)
             .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.HEADERS));
-    Retrofit retrofit = new Retrofit.Builder()
+    Retrofit retrofit = new Retrofit.Builder()  //init retrofit object
             .baseUrl("http://localhost/")
-            .addConverterFactory(JacksonConverterFactory.create(mapper))
+            .addConverterFactory(JacksonConverterFactory.create(mapper))    //telling retrofit to use jackson to parse JSON's
             .client(httpClient.build())
             .build();
 }
