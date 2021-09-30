@@ -269,7 +269,6 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
             public void onResponse(Call<ImgurResponse> call, @NotNull retrofit2.Response<ImgurResponse> response) {
                 ImgurResponse tmp = response.body();
                 if (response.isSuccessful()) {  //if http returns success status
-                    assert tmp != null;
                     url = tmp.getData().getLink();  //getting string url
                     reverseImageSearch(url);    //calling bing API function
                 }
@@ -288,8 +287,10 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
      *
      * @param link url of image
      */
-    public void reverseImageSearch(String link) {
+    public void reverseImageSearch(String link)
+    {
         Call<ImageKnowledge> call = null;
+
         try {
             call = CLIENT_API.getReverseImageSearch(
                     RequestBody.create(
@@ -301,13 +302,11 @@ public class CaptchaActivity extends AppCompatActivity implements View.OnClickLi
 
         //same as before, function is 2 parts.
 
-        assert call != null;
         call.enqueue(new Callback<ImageKnowledge>() {
             @Override
             public void onResponse(@NotNull Call<ImageKnowledge> call, @NotNull Response<ImageKnowledge> response) {
                 if (response.isSuccessful()) {  //if http returns success status
                     List<ImageObject> lst = null;   //creating list
-                    assert response.body() != null;
                     for (ImageAction tmp : response.body().tags().get(0).actions()) {   //iterating JSON object to get required data.
                         if (tmp.actionType().equals("VisualSearch")) {
                             lst = ((ImageModuleAction) tmp).data().value();
